@@ -1,7 +1,33 @@
 const { MonitorType } = require("./monitor-type");
-const { UP } = require("../../src/util");
+const { UP, log } = require("../../src/util");
 const { MongoClient } = require("mongodb");
 const jsonata = require("jsonata");
+
+/**
+ * Commands allowed for the MongoDB monitor. Anything not on this list is
+ * rejected to prevent arbitrary admin/write operations via the monitor UI.
+ */
+const ALLOWED_MONGODB_COMMANDS = new Set([
+    "ping",
+    "hello",
+    "isMaster",
+    "ismaster",
+    "serverStatus",
+    "dbStats",
+    "collStats",
+    "count",
+    "find",
+    "aggregate",
+    "distinct",
+    "explain",
+    "listCollections",
+    "listDatabases",
+    "connectionStatus",
+    "buildInfo",
+    "hostInfo",
+    "features",
+    "getParameter",
+]);
 
 class MongodbMonitorType extends MonitorType {
     name = "mongodb";
@@ -13,6 +39,15 @@ class MongodbMonitorType extends MonitorType {
         let command = { ping: 1 };
         if (monitor.databaseQuery) {
             command = JSON.parse(monitor.databaseQuery);
+
+            const commandKeys = Object.keys(command);
+            const primaryCommand = commandKeys[0];
+            if (!primaryCommand || !ALLOWED_MONGODB_COMMANDS.has(primaryCommand)) {
+                throw new Error(
+                    `MongoDB command "${primaryCommand}" is not allowed. ` +
+                    `Permitted commands: ${[...ALLOWED_MONGODB_COMMANDS].join(", ")}`
+                );
+            }
         }
 
         let result = await this.runMongodbCommand(monitor.databaseConnectionString, command);

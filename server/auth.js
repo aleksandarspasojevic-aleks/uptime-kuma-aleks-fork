@@ -70,56 +70,52 @@ async function verifyAPIKey(key) {
  */
 
 /**
- * Custom authorizer for express-basic-auth
- * @param {string} username Username to login with
- * @param {string} password Password to login with
- * @param {authCallback} callback Callback to handle login result
- * @returns {void}
+ * Create an API key authorizer scoped to a client IP.
+ * @param {string} clientIP The client's IP address
+ * @returns {Function} express-basic-auth async authorizer
  */
-function apiAuthorizer(username, password, callback) {
-    // API Rate Limit
-    apiRateLimiter.pass(null, 0).then((pass) => {
-        if (pass) {
-            verifyAPIKey(password).then((valid) => {
-                if (!valid) {
-                    log.warn("api-auth", "Failed API auth attempt: invalid API Key");
-                }
-                callback(null, valid);
-                // Only allow a set number of api requests per minute
-                // (currently set to 60)
-                apiRateLimiter.removeTokens(1);
-            });
-        } else {
-            log.warn("api-auth", "Failed API auth attempt: rate limit exceeded");
-            callback(null, false);
-        }
-    });
+function createApiAuthorizer(clientIP) {
+    return function apiAuthorizer(username, password, callback) {
+        apiRateLimiter.pass(null, clientIP, 0).then((pass) => {
+            if (pass) {
+                verifyAPIKey(password).then((valid) => {
+                    if (!valid) {
+                        log.warn("api-auth", `Failed API auth attempt: invalid API Key. IP=${clientIP}`);
+                    }
+                    callback(null, valid);
+                    apiRateLimiter.removeTokens(1, clientIP);
+                });
+            } else {
+                log.warn("api-auth", `Failed API auth attempt: rate limit exceeded. IP=${clientIP}`);
+                callback(null, false);
+            }
+        });
+    };
 }
 
 /**
- * Custom authorizer for express-basic-auth
- * @param {string} username Username to login with
- * @param {string} password Password to login with
- * @param {authCallback} callback Callback to handle login result
- * @returns {void}
+ * Create a user/password authorizer scoped to a client IP.
+ * @param {string} clientIP The client's IP address
+ * @returns {Function} express-basic-auth async authorizer
  */
-function userAuthorizer(username, password, callback) {
-    // Login Rate Limit
-    loginRateLimiter.pass(null, 0).then((pass) => {
-        if (pass) {
-            exports.login(username, password).then((user) => {
-                callback(null, user != null);
+function createUserAuthorizer(clientIP) {
+    return function userAuthorizer(username, password, callback) {
+        loginRateLimiter.pass(null, clientIP, 0).then((pass) => {
+            if (pass) {
+                exports.login(username, password).then((user) => {
+                    callback(null, user != null);
 
-                if (user == null) {
-                    log.warn("basic-auth", "Failed basic auth attempt: invalid username/password");
-                    loginRateLimiter.removeTokens(1);
-                }
-            });
-        } else {
-            log.warn("basic-auth", "Failed basic auth attempt: rate limit exceeded");
-            callback(null, false);
-        }
-    });
+                    if (user == null) {
+                        log.warn("basic-auth", `Failed basic auth attempt: invalid username/password. IP=${clientIP}`);
+                        loginRateLimiter.removeTokens(1, clientIP);
+                    }
+                });
+            } else {
+                log.warn("basic-auth", `Failed basic auth attempt: rate limit exceeded. IP=${clientIP}`);
+                callback(null, false);
+            }
+        });
+    };
 }
 
 /**
@@ -130,8 +126,10 @@ function userAuthorizer(username, password, callback) {
  * @returns {Promise<void>}
  */
 exports.basicAuth = async function (req, res, next) {
+    const clientIP = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || req.connection?.remoteAddress || "unknown";
+
     const middleware = basicAuth({
-        authorizer: userAuthorizer,
+        authorizer: createUserAuthorizer(clientIP),
         authorizeAsync: true,
         challenge: true,
     });
@@ -154,17 +152,19 @@ exports.basicAuth = async function (req, res, next) {
  */
 exports.apiAuth = async function (req, res, next) {
     if (!(await Settings.get("disableAuth"))) {
+        const clientIP = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || req.connection?.remoteAddress || "unknown";
+
         let usingAPIKeys = await Settings.get("apiKeysEnabled");
         let middleware;
         if (usingAPIKeys) {
             middleware = basicAuth({
-                authorizer: apiAuthorizer,
+                authorizer: createApiAuthorizer(clientIP),
                 authorizeAsync: true,
                 challenge: true,
             });
         } else {
             middleware = basicAuth({
-                authorizer: userAuthorizer,
+                authorizer: createUserAuthorizer(clientIP),
                 authorizeAsync: true,
                 challenge: true,
             });

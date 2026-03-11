@@ -24,3 +24,8 @@ extra/exe-builder/obj
 
 .vs
 .vscode
+
+# Test TLS certs (generate locally, never commit)
+test/manual-test-radius-tls/certs/*.key
+test/manual-test-radius-tls/certs/*.crt
+test/manual-test-radius-tls/certs/*.pem

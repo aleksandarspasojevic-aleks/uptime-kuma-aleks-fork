@@ -127,6 +127,7 @@ const Database = require("./database");
 log.debug("server", "Importing Background Jobs");
 const { initBackgroundJobs, stopBackgroundJobs } = require("./jobs");
 const { loginRateLimiter, twoFaRateLimiter } = require("./rate-limiter");
+const { tokenBlacklist } = require("./token-blacklist");
 
 const { apiAuth } = require("./auth");
 const { login } = require("./auth");
@@ -386,6 +387,10 @@ let needSetup = false;
             log.info("auth", `Login by token. IP=${clientIP}`);
 
             try {
+                if (tokenBlacklist.isRevoked(token)) {
+                    throw new Error("Token has been revoked");
+                }
+
                 let decoded = jwt.verify(token, server.jwtSecret);
 
                 log.info("auth", "Username from JWT: " + decoded.username);
@@ -400,6 +405,7 @@ let needSetup = false;
 
                     log.debug("auth", "afterLogin");
                     await afterLogin(socket, user);
+                    socket.token = token;
                     log.debug("auth", "afterLogin ok");
 
                     log.info("auth", `Successfully logged in user ${decoded.username}. IP=${clientIP}`);
@@ -417,15 +423,24 @@ let needSetup = false;
                     });
                 }
             } catch (error) {
-                log.error("auth", `Invalid token. IP=${clientIP}`);
-                if (error.message) {
-                    log.error("auth", error.message, `IP=${clientIP}`);
+                if (error.name === "TokenExpiredError") {
+                    log.info("auth", `Token expired. IP=${clientIP}`);
+                    callback({
+                        ok: false,
+                        msg: "authTokenExpired",
+                        msgi18n: true,
+                    });
+                } else {
+                    log.error("auth", `Invalid token. IP=${clientIP}`);
+                    if (error.message) {
+                        log.error("auth", error.message, `IP=${clientIP}`);
+                    }
+                    callback({
+                        ok: false,
+                        msg: "authInvalidToken",
+                        msgi18n: true,
+                    });
                 }
-                callback({
-                    ok: false,
-                    msg: "authInvalidToken",
-                    msgi18n: true,
-                });
             }
         });
 
@@ -443,8 +458,8 @@ let needSetup = false;
                 return;
             }
 
-            // Login Rate Limit
-            if (!(await loginRateLimiter.pass(callback))) {
+            // Login Rate Limit (per-IP)
+            if (!(await loginRateLimiter.pass(callback, clientIP))) {
                 log.info("auth", `Too many failed requests for user ${data.username}. IP=${clientIP}`);
                 return;
             }
@@ -455,11 +470,14 @@ let needSetup = false;
                 if (user.twofa_status === 0) {
                     await afterLogin(socket, user);
 
+                    let token = User.createJWT(user, server.jwtSecret);
+                    socket.token = token;
+
                     log.info("auth", `Successfully logged in user ${data.username}. IP=${clientIP}`);
 
                     callback({
                         ok: true,
-                        token: User.createJWT(user, server.jwtSecret),
+                        token,
                     });
                 }
 
@@ -482,11 +500,14 @@ let needSetup = false;
                             socket.userID,
                         ]);
 
+                        let jwtToken = User.createJWT(user, server.jwtSecret);
+                        socket.token = jwtToken;
+
                         log.info("auth", `Successfully logged in user ${data.username}. IP=${clientIP}`);
 
                         callback({
                             ok: true,
-                            token: User.createJWT(user, server.jwtSecret),
+                            token: jwtToken,
                         });
                     } else {
                         log.warn("auth", `Invalid token provided for user ${data.username}. IP=${clientIP}`);
@@ -510,9 +531,19 @@ let needSetup = false;
         });
 
         socket.on("logout", async (callback) => {
-            // Rate Limit
-            if (!(await loginRateLimiter.pass(callback))) {
+            const clientIP = await server.getClientIP(socket);
+            // Rate Limit (per-IP)
+            if (!(await loginRateLimiter.pass(callback, clientIP))) {
                 return;
+            }
+
+            if (socket.token) {
+                try {
+                    const decoded = jwt.decode(socket.token);
+                    const expiresAtMs = decoded?.exp ? decoded.exp * 1000 : undefined;
+                    tokenBlacklist.add(socket.token, expiresAtMs);
+                } catch (_) { /* best effort */ }
+                socket.token = null;
             }
 
             socket.leave(socket.userID);
@@ -525,7 +556,8 @@ let needSetup = false;
 
         socket.on("prepare2FA", async (currentPassword, callback) => {
             try {
-                if (!(await twoFaRateLimiter.pass(callback))) {
+                const clientIP = await server.getClientIP(socket);
+                if (!(await twoFaRateLimiter.pass(callback, clientIP))) {
                     return;
                 }
 
@@ -570,7 +602,7 @@ let needSetup = false;
             const clientIP = await server.getClientIP(socket);
 
             try {
-                if (!(await twoFaRateLimiter.pass(callback))) {
+                if (!(await twoFaRateLimiter.pass(callback, clientIP))) {
                     return;
                 }
 
@@ -600,7 +632,7 @@ let needSetup = false;
             const clientIP = await server.getClientIP(socket);
 
             try {
-                if (!(await twoFaRateLimiter.pass(callback))) {
+                if (!(await twoFaRateLimiter.pass(callback, clientIP))) {
                     return;
                 }
 
