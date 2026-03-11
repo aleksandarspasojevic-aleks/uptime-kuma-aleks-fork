@@ -319,6 +319,11 @@
                 </div>
             </div>
 
+            <!-- Playwright Test Results -->
+            <div v-if="monitor.playwrightTestEnabled" class="shadow-box big-padding">
+                <PlaywrightTestResults :monitor-id="monitor.id" />
+            </div>
+
             <!-- Screenshot -->
             <div v-if="monitor.type === 'real-browser'" class="shadow-box">
                 <div class="row">
@@ -472,6 +477,7 @@ import { PrismEditor } from "vue-prism-editor";
 import "vue-prism-editor/dist/prismeditor.min.css";
 import ScreenshotDialog from "../components/ScreenshotDialog.vue";
 import LighthouseScoreGauge from "../components/LighthouseScoreGauge.vue";
+import PlaywrightTestResults from "../components/PlaywrightTestResults.vue";
 const LighthouseChart = defineAsyncComponent(() => import("../components/LighthouseChart.vue"));
 
 export default {
@@ -490,6 +496,7 @@ export default {
         ScreenshotDialog,
         LighthouseScoreGauge,
         LighthouseChart,
+        PlaywrightTestResults,
     },
     data() {
         return {

@@ -54,6 +54,7 @@ export default {
             dockerHostList: [],
             remoteBrowserList: [],
             lighthouseData: {},
+            playwrightTestData: {},
             statusPageListLoaded: false,
             statusPageList: [],
             proxyList: [],
@@ -251,6 +252,35 @@ export default {
 
             socket.on("lighthouseList", (monitorID, data) => {
                 this.lighthouseData[monitorID] = data;
+            });
+
+            socket.on("playwrightTestResult", (data) => {
+                if (!(data.monitorID in this.playwrightTestData)) {
+                    this.playwrightTestData[data.monitorID] = [];
+                }
+                const newRuns = data.results.map(r => ({
+                    id: r.testID,
+                    monitor_id: data.monitorID,
+                    playwright_test_id: r.testID,
+                    test_name: r.testName,
+                    status: r.status,
+                    duration: r.duration,
+                    error_message: r.errorMessage,
+                    report_path: r.reportPath,
+                    time: r.time,
+                }));
+                this.playwrightTestData[data.monitorID] = [
+                    ...newRuns,
+                    ...this.playwrightTestData[data.monitorID],
+                ];
+            });
+
+            socket.on("playwrightTestRunList", (monitorID, data) => {
+                this.playwrightTestData[monitorID] = data;
+            });
+
+            socket.on("playwrightTestList", (monitorID, data) => {
+                // stored for reference if needed
             });
 
             socket.on("avgPing", (monitorID, data) => {

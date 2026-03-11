@@ -2,6 +2,7 @@ const dayjs = require("dayjs");
 const axios = require("axios");
 const { Prometheus } = require("../prometheus");
 const { runLighthouse } = require("../lighthouse-runner");
+const { runPlaywrightTests, cleanupOldReports } = require("../playwright-test-runner");
 const {
     log,
     UP,
@@ -218,6 +219,10 @@ class Monitor extends BeanModel {
             // lighthouse audit options
             lighthouseEnabled: Boolean(this.lighthouse_enabled),
             lighthouseInterval: this.lighthouse_interval,
+
+            // playwright test options
+            playwrightTestEnabled: Boolean(this.playwright_test_enabled),
+            playwrightTestInterval: this.playwright_test_interval,
         };
 
         if (includeSensitiveData) {
@@ -1110,7 +1115,7 @@ class Monitor extends BeanModel {
                         "SELECT time FROM lighthouse_result WHERE monitor_id = ? ORDER BY time DESC",
                         [this.id]
                     );
-                    const elapsed = lastLH ? dayjs().diff(dayjs(lastLH), "second") : Infinity;
+                    const elapsed = lastLH ? dayjs().diff(dayjs.utc(lastLH), "second") : Infinity;
 
                     if (elapsed >= (this.lighthouse_interval || 3600)) {
                         log.info("lighthouse", `[${this.name}] Running Lighthouse audit...`);
@@ -1137,6 +1142,65 @@ class Monitor extends BeanModel {
                     }
                 } catch (lhError) {
                     log.warn("lighthouse", `[${this.name}] Lighthouse audit failed: ${lhError.message}`);
+                }
+            }
+
+            // Playwright tests (runs on its own interval, never affects heartbeat status)
+            if (this.playwright_test_enabled && this.url) {
+                try {
+                    const lastPWRows = await R.getAll(
+                        "SELECT time FROM playwright_test_run WHERE monitor_id = ? ORDER BY time DESC LIMIT 1",
+                        [this.id]
+                    );
+                    const lastPW = lastPWRows.length > 0 ? lastPWRows[0].time : null;
+                    const pwInterval = this.playwright_test_interval || 3600;
+                    const pwElapsed = lastPW ? dayjs().diff(dayjs.utc(lastPW), "second") : Infinity;
+
+                    log.debug("playwright", `[${this.name}] Interval check: elapsed=${pwElapsed}s, required=${pwInterval}s, lastRun=${lastPW}`);
+
+                    if (pwElapsed >= pwInterval) {
+                        const activeTests = await R.getAll(
+                            "SELECT id, filename, name FROM playwright_test WHERE monitor_id = ? AND active = 1",
+                            [this.id]
+                        );
+
+                        if (activeTests.length > 0) {
+                            log.info("playwright", `[${this.name}] Running ${activeTests.length} Playwright test(s)...`);
+                            const results = await runPlaywrightTests(this.id, activeTests);
+                            const runTime = R.isoDateTimeMillis(dayjs.utc());
+
+                            for (const result of results) {
+                                const runBean = R.dispense("playwright_test_run");
+                                runBean.monitor_id = this.id;
+                                runBean.playwright_test_id = result.testID;
+                                runBean.time = runTime;
+                                runBean.status = result.status;
+                                runBean.duration = result.duration;
+                                runBean.error_message = result.errorMessage;
+                                runBean.report_path = result.reportPath;
+                                await R.store(runBean);
+
+                                log.info("playwright", `[${this.name}] Test "${result.testName}": ${result.status}`);
+                            }
+
+                            io.to(this.user_id).emit("playwrightTestResult", {
+                                monitorID: this.id,
+                                results: results.map(r => ({
+                                    testID: r.testID,
+                                    testName: r.testName,
+                                    status: r.status,
+                                    duration: r.duration,
+                                    errorMessage: r.errorMessage,
+                                    reportPath: r.reportPath,
+                                    time: runTime,
+                                })),
+                            });
+
+                            await cleanupOldReports(this.id);
+                        }
+                    }
+                } catch (pwError) {
+                    log.warn("playwright", `[${this.name}] Playwright tests failed: ${pwError.message}`);
                 }
             }
 

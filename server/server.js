@@ -192,6 +192,7 @@ const { resetChrome } = require("./monitor-types/real-browser-monitor-type");
 const { EmbeddedMariaDB } = require("./embedded-mariadb");
 const { SetupDatabase } = require("./setup-database");
 const { chartSocketHandler } = require("./socket-handlers/chart-socket-handler");
+const { playwrightTestSocketHandler } = require("./socket-handlers/playwright-test-socket-handler");
 
 app.use(express.json());
 
@@ -798,6 +799,8 @@ let needSetup = false;
                 }
                 bean.lighthouse_enabled = monitor.lighthouseEnabled;
                 bean.lighthouse_interval = monitor.lighthouseInterval;
+                bean.playwright_test_enabled = monitor.playwrightTestEnabled;
+                bean.playwright_test_interval = monitor.playwrightTestInterval;
                 bean.user_id = socket.userID;
 
                 bean.validate();
@@ -969,6 +972,10 @@ let needSetup = false;
                 // lighthouse audit options
                 bean.lighthouse_enabled = monitor.lighthouseEnabled;
                 bean.lighthouse_interval = monitor.lighthouseInterval;
+
+                // playwright test options
+                bean.playwright_test_enabled = monitor.playwrightTestEnabled;
+                bean.playwright_test_interval = monitor.playwrightTestInterval;
 
                 // ping advanced options
                 bean.ping_numeric = monitor.ping_numeric;
@@ -1768,6 +1775,7 @@ let needSetup = false;
         remoteBrowserSocketHandler(socket);
         generalSocketHandler(socket, server);
         chartSocketHandler(socket);
+        playwrightTestSocketHandler(socket);
 
         log.debug("server", "added all socket handlers");
 

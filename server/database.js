@@ -158,6 +158,16 @@ class Database {
             fs.mkdirSync(Database.dockerTLSDir, { recursive: true });
         }
 
+        Database.playwrightTestDir = path.join(Database.dataDir, "playwright-tests/");
+        if (!fs.existsSync(Database.playwrightTestDir)) {
+            fs.mkdirSync(Database.playwrightTestDir, { recursive: true });
+        }
+
+        Database.playwrightReportDir = path.join(Database.dataDir, "playwright-reports/");
+        if (!fs.existsSync(Database.playwrightReportDir)) {
+            fs.mkdirSync(Database.playwrightReportDir, { recursive: true });
+        }
+
         log.info("server", `Data Dir: ${Database.dataDir}`);
     }
 

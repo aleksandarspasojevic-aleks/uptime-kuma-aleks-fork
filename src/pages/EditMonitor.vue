@@ -355,6 +355,166 @@
                                 </div>
                             </template>
 
+                            <!-- Playwright Tests (optional add-on for URL-based monitors) -->
+                            <template
+                                v-if="
+                                    monitor.type === 'http' ||
+                                    monitor.type === 'keyword' ||
+                                    monitor.type === 'json-query' ||
+                                    monitor.type === 'real-browser'
+                                "
+                            >
+                                <h2 class="mt-5 mb-2">{{ $t("Playwright Tests") }}</h2>
+                                <div class="my-3 form-check">
+                                    <input
+                                        id="playwright-toggle"
+                                        v-model="monitor.playwrightTestEnabled"
+                                        class="form-check-input"
+                                        type="checkbox"
+                                    />
+                                    <label class="form-check-label" for="playwright-toggle">
+                                        {{ $t("Enable Playwright Tests") }}
+                                    </label>
+                                    <div class="form-text">
+                                        {{ $t("playwrightDescription") }}
+                                    </div>
+                                </div>
+                                <template v-if="monitor.playwrightTestEnabled">
+                                    <div class="my-3">
+                                        <label for="playwright-interval" class="form-label">
+                                            {{ $t("Playwright Test Interval") }} ({{ $t("secondsShort") }})
+                                        </label>
+                                        <input
+                                            id="playwright-interval"
+                                            v-model.number="monitor.playwrightTestInterval"
+                                            type="number"
+                                            class="form-control"
+                                            :min="300"
+                                            step="60"
+                                        />
+                                        <div class="form-text">
+                                            {{ $t("playwrightIntervalDescription") }}
+                                        </div>
+                                    </div>
+
+                                    <!-- Uploaded test files list -->
+                                    <div v-if="playwrightTests.length > 0" class="my-3">
+                                        <label class="form-label">{{ $t("Test Files") }}</label>
+                                        <table class="table table-sm table-bordered">
+                                            <thead>
+                                                <tr>
+                                                    <th>{{ $t("Test Name") }}</th>
+                                                    <th>{{ $t("Filename") }}</th>
+                                                    <th>{{ $t("Active") }}</th>
+                                                    <th></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr v-for="test in playwrightTests" :key="test.id">
+                                                    <td>{{ test.name }}</td>
+                                                    <td><code>{{ test.filename }}</code></td>
+                                                    <td>
+                                                        <div class="form-check form-switch">
+                                                            <input
+                                                                class="form-check-input"
+                                                                type="checkbox"
+                                                                :checked="test.active"
+                                                                @change="togglePlaywrightTest(test.id, $event.target.checked)"
+                                                            />
+                                                        </div>
+                                                    </td>
+                                                    <td class="test-actions">
+                                                        <button
+                                                            class="btn btn-sm btn-outline-info me-1"
+                                                            type="button"
+                                                            :title="$t('View')"
+                                                            @click="viewPlaywrightTest(test.id)"
+                                                        >
+                                                            <font-awesome-icon icon="eye" />
+                                                        </button>
+                                                        <button
+                                                            class="btn btn-sm btn-outline-secondary me-1"
+                                                            type="button"
+                                                            :title="$t('Download')"
+                                                            @click="downloadPlaywrightTest(test.id)"
+                                                        >
+                                                            <font-awesome-icon icon="download" />
+                                                        </button>
+                                                        <button
+                                                            class="btn btn-sm btn-outline-danger"
+                                                            type="button"
+                                                            :title="$t('Delete')"
+                                                            @click="deletePlaywrightTest(test.id)"
+                                                        >
+                                                            <font-awesome-icon icon="trash" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <!-- Upload new test file -->
+                                    <div v-if="monitor.id" class="my-3">
+                                        <label class="form-label">{{ $t("Upload Test File") }}</label>
+                                        <div class="input-group mb-2">
+                                            <input
+                                                v-model="newPlaywrightTestName"
+                                                type="text"
+                                                class="form-control"
+                                                :placeholder="$t('Test Name')"
+                                            />
+                                        </div>
+                                        <div class="input-group mb-2">
+                                            <input
+                                                ref="playwrightFileInput"
+                                                type="file"
+                                                class="form-control"
+                                                accept=".js,.ts"
+                                            />
+                                            <button
+                                                class="btn btn-primary"
+                                                type="button"
+                                                :disabled="uploadingPlaywrightTest"
+                                                @click="addPlaywrightTest"
+                                            >
+                                                {{ $t("Add Test") }}
+                                            </button>
+                                        </div>
+                                        <div class="form-text">
+                                            {{ $t("playwrightFileHint") }}
+                                        </div>
+                                    </div>
+                                    <div v-else class="my-3">
+                                        <div class="form-text text-warning">
+                                            {{ $t("Save the monitor first to upload test files.") }}
+                                        </div>
+                                    </div>
+
+                                    <!-- Test Code Viewer Modal -->
+                                    <div v-if="playwrightViewContent !== null" class="playwright-code-modal-backdrop" @click.self="playwrightViewContent = null">
+                                        <div class="playwright-code-modal">
+                                            <div class="playwright-code-modal-header">
+                                                <h5>{{ playwrightViewName }}</h5>
+                                                <div>
+                                                    <button
+                                                        class="btn btn-sm btn-outline-secondary me-2"
+                                                        type="button"
+                                                        @click="downloadViewedTest"
+                                                    >
+                                                        <font-awesome-icon icon="download" /> {{ $t("Download") }}
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-light" type="button" @click="playwrightViewContent = null">
+                                                        <font-awesome-icon icon="times" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <pre class="playwright-code-block"><code>{{ playwrightViewContent }}</code></pre>
+                                        </div>
+                                    </div>
+                                </template>
+                            </template>
+
                             <!-- Game -->
                             <!-- GameDig only -->
                             <div v-if="monitor.type === 'gamedig'" class="my-3">
@@ -2948,6 +3108,8 @@ const monitorDefaults = {
     system_service_name: "",
     lighthouseEnabled: false,
     lighthouseInterval: 3600,
+    playwrightTestEnabled: false,
+    playwrightTestInterval: 3600,
 };
 
 export default {
@@ -2993,6 +3155,12 @@ export default {
             },
             draftGroupName: null,
             remoteBrowsersEnabled: false,
+            playwrightTests: [],
+            newPlaywrightTestName: "",
+            uploadingPlaywrightTest: false,
+            playwrightViewContent: null,
+            playwrightViewName: "",
+            playwrightViewFilename: "",
             lowIntervalConfirmation: {
                 confirmed: false,
                 editedValue: false,
@@ -3667,6 +3835,8 @@ message HealthCheckResponse {
                                 this.monitor.timeout = ~~(this.monitor.interval * 8) / 10;
                             }
                         }
+
+                        this.loadPlaywrightTests();
                     } else {
                         this.$root.toastError(res.msg);
                     }
@@ -4078,6 +4248,130 @@ message HealthCheckResponse {
                 });
             }, 500);
         },
+
+        /**
+         * Load Playwright tests for the current monitor
+         */
+        loadPlaywrightTests() {
+            if (!this.monitor.id) {
+                return;
+            }
+            this.$root.getSocket().emit("getPlaywrightTests", this.monitor.id, (res) => {
+                if (res.ok) {
+                    this.playwrightTests = res.tests;
+                }
+            });
+        },
+
+        /**
+         * Upload a new Playwright test file
+         */
+        addPlaywrightTest() {
+            const fileInput = this.$refs.playwrightFileInput;
+            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                this.$root.toastError("Please select a test file.");
+                return;
+            }
+            if (!this.newPlaywrightTestName.trim()) {
+                this.$root.toastError("Please enter a test name.");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            this.uploadingPlaywrightTest = true;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const fileContent = e.target.result;
+                this.$root.getSocket().emit("addPlaywrightTest", {
+                    monitorID: this.monitor.id,
+                    name: this.newPlaywrightTestName.trim(),
+                    fileContent,
+                }, (res) => {
+                    this.uploadingPlaywrightTest = false;
+                    if (res.ok) {
+                        this.$root.toastRes(res);
+                        this.newPlaywrightTestName = "";
+                        fileInput.value = "";
+                        this.loadPlaywrightTests();
+                    } else {
+                        this.$root.toastError(res.msg);
+                    }
+                });
+            };
+            reader.readAsText(file);
+        },
+
+        /**
+         * Toggle a Playwright test active/inactive
+         * @param {number} testID
+         * @param {boolean} active
+         */
+        togglePlaywrightTest(testID, active) {
+            this.$root.getSocket().emit("togglePlaywrightTest", { testID, active }, (res) => {
+                if (res.ok) {
+                    this.loadPlaywrightTests();
+                } else {
+                    this.$root.toastError(res.msg);
+                }
+            });
+        },
+
+        /**
+         * Delete a Playwright test
+         * @param {number} testID
+         */
+        deletePlaywrightTest(testID) {
+            if (!confirm(this.$t("deletePlaywrightTestMsg"))) {
+                return;
+            }
+            this.$root.getSocket().emit("deletePlaywrightTest", testID, (res) => {
+                if (res.ok) {
+                    this.$root.toastRes(res);
+                    this.loadPlaywrightTests();
+                } else {
+                    this.$root.toastError(res.msg);
+                }
+            });
+        },
+
+        viewPlaywrightTest(testID) {
+            this.$root.getSocket().emit("getPlaywrightTestContent", testID, (res) => {
+                if (res.ok) {
+                    this.playwrightViewContent = res.content;
+                    this.playwrightViewName = res.name;
+                    this.playwrightViewFilename = res.filename;
+                } else {
+                    this.$root.toastError(res.msg);
+                }
+            });
+        },
+
+        downloadPlaywrightTest(testID) {
+            this.$root.getSocket().emit("getPlaywrightTestContent", testID, (res) => {
+                if (res.ok) {
+                    this.triggerFileDownload(res.content, res.filename);
+                } else {
+                    this.$root.toastError(res.msg);
+                }
+            });
+        },
+
+        downloadViewedTest() {
+            this.triggerFileDownload(this.playwrightViewContent, this.playwrightViewFilename);
+        },
+
+        triggerFileDownload(content, filename) {
+            const blob = new Blob([content], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        },
     },
 };
 </script>
@@ -4087,5 +4381,65 @@ message HealthCheckResponse {
 
 textarea {
     min-height: 200px;
+}
+
+.test-actions {
+    white-space: nowrap;
+}
+
+.playwright-code-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.playwright-code-modal {
+    background: var(--bs-body-bg, #fff);
+    border-radius: 8px;
+    width: 80vw;
+    max-width: 900px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.playwright-code-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+
+    h5 {
+        margin: 0;
+    }
+}
+
+.playwright-code-block {
+    margin: 0;
+    padding: 16px;
+    overflow: auto;
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.5;
+    background: var(--bs-tertiary-bg, #f8f9fa);
+    border-radius: 0 0 8px 8px;
+
+    code {
+        white-space: pre;
+        tab-size: 4;
+    }
+}
+
+.dark .playwright-code-block {
+    background: #1e1e2e;
 }
 </style>

@@ -252,6 +252,38 @@ async function sendLighthouseList(socket, monitorID) {
     io.to(socket.userID).emit("lighthouseList", monitorID, list);
 }
 
+/**
+ * Send list of Playwright tests for a monitor
+ * @param {Socket} socket Socket.io socket instance
+ * @param {number} monitorID ID of the monitor
+ * @returns {Promise<void>}
+ */
+async function sendPlaywrightTestList(socket, monitorID) {
+    let list = await R.getAll(
+        "SELECT * FROM playwright_test WHERE monitor_id = ? ORDER BY created_date ASC",
+        [monitorID]
+    );
+    io.to(socket.userID).emit("playwrightTestList", monitorID, list);
+}
+
+/**
+ * Send Playwright test run history for a monitor
+ * @param {Socket} socket Socket.io socket instance
+ * @param {number} monitorID ID of the monitor
+ * @returns {Promise<void>}
+ */
+async function sendPlaywrightTestRunList(socket, monitorID) {
+    let list = await R.getAll(`
+        SELECT r.*, t.name as test_name
+        FROM playwright_test_run r
+        JOIN playwright_test t ON t.id = r.playwright_test_id
+        WHERE r.monitor_id = ?
+        ORDER BY r.time DESC
+        LIMIT 200
+    `, [monitorID]);
+    io.to(socket.userID).emit("playwrightTestRunList", monitorID, list);
+}
+
 module.exports = {
     sendNotificationList,
     sendImportantHeartbeatList,
@@ -263,4 +295,6 @@ module.exports = {
     sendRemoteBrowserList,
     sendMonitorTypeList,
     sendLighthouseList,
+    sendPlaywrightTestList,
+    sendPlaywrightTestRunList,
 };
