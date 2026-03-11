@@ -313,6 +313,48 @@
                                 </div>
                             </div>
 
+                            <!-- Lighthouse Audit (optional add-on for URL-based monitors) -->
+                            <template
+                                v-if="
+                                    monitor.type === 'http' ||
+                                    monitor.type === 'keyword' ||
+                                    monitor.type === 'json-query' ||
+                                    monitor.type === 'real-browser'
+                                "
+                            >
+                                <h2 class="mt-5 mb-2">{{ $t("Lighthouse Audit") }}</h2>
+                                <div class="my-3 form-check">
+                                    <input
+                                        id="lighthouse-toggle"
+                                        v-model="monitor.lighthouseEnabled"
+                                        class="form-check-input"
+                                        type="checkbox"
+                                    />
+                                    <label class="form-check-label" for="lighthouse-toggle">
+                                        {{ $t("Enable Lighthouse Audit") }}
+                                    </label>
+                                    <div class="form-text">
+                                        {{ $t("lighthouseDescription") }}
+                                    </div>
+                                </div>
+                                <div v-if="monitor.lighthouseEnabled" class="my-3">
+                                    <label for="lighthouse-interval" class="form-label">
+                                        {{ $t("Lighthouse Audit Interval") }} ({{ $t("secondsShort") }})
+                                    </label>
+                                    <input
+                                        id="lighthouse-interval"
+                                        v-model.number="monitor.lighthouseInterval"
+                                        type="number"
+                                        class="form-control"
+                                        :min="300"
+                                        step="60"
+                                    />
+                                    <div class="form-text">
+                                        {{ $t("lighthouseIntervalDescription") }}
+                                    </div>
+                                </div>
+                            </template>
+
                             <!-- Game -->
                             <!-- GameDig only -->
                             <div v-if="monitor.type === 'gamedig'" class="my-3">
@@ -2904,6 +2946,8 @@ const monitorDefaults = {
     rabbitmqPassword: "",
     conditions: [],
     system_service_name: "",
+    lighthouseEnabled: false,
+    lighthouseInterval: 3600,
 };
 
 export default {

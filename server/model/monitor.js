@@ -1,6 +1,7 @@
 const dayjs = require("dayjs");
 const axios = require("axios");
 const { Prometheus } = require("../prometheus");
+const { runLighthouse } = require("../lighthouse-runner");
 const {
     log,
     UP,
@@ -213,6 +214,10 @@ class Monitor extends BeanModel {
             saveResponse: this.getSaveResponse(),
             saveErrorResponse: this.getSaveErrorResponse(),
             responseMaxLength: this.response_max_length ?? RESPONSE_BODY_LENGTH_DEFAULT,
+
+            // lighthouse audit options
+            lighthouseEnabled: Boolean(this.lighthouse_enabled),
+            lighthouseInterval: this.lighthouse_interval,
         };
 
         if (includeSensitiveData) {
@@ -1097,6 +1102,43 @@ class Monitor extends BeanModel {
             // Store to database
             log.debug("monitor", `[${this.name}] Store`);
             await R.store(bean);
+
+            // Lighthouse audit (runs on its own interval, never affects heartbeat status)
+            if (this.lighthouse_enabled && this.url) {
+                try {
+                    const lastLH = await R.getCell(
+                        "SELECT time FROM lighthouse_result WHERE monitor_id = ? ORDER BY time DESC",
+                        [this.id]
+                    );
+                    const elapsed = lastLH ? dayjs().diff(dayjs(lastLH), "second") : Infinity;
+
+                    if (elapsed >= (this.lighthouse_interval || 3600)) {
+                        log.info("lighthouse", `[${this.name}] Running Lighthouse audit...`);
+                        const scores = await runLighthouse(this.url);
+                        const lhBean = R.dispense("lighthouse_result");
+                        lhBean.monitor_id = this.id;
+                        lhBean.time = R.isoDateTimeMillis(dayjs.utc());
+                        lhBean.performance = scores.performance;
+                        lhBean.accessibility = scores.accessibility;
+                        lhBean.best_practices = scores.bestPractices;
+                        lhBean.seo = scores.seo;
+                        await R.store(lhBean);
+
+                        log.info("lighthouse", `[${this.name}] Scores: P=${scores.performance} A=${scores.accessibility} BP=${scores.bestPractices} SEO=${scores.seo}`);
+
+                        io.to(this.user_id).emit("lighthouseResult", {
+                            monitorID: this.id,
+                            performance: scores.performance,
+                            accessibility: scores.accessibility,
+                            bestPractices: scores.bestPractices,
+                            seo: scores.seo,
+                            time: lhBean.time,
+                        });
+                    }
+                } catch (lhError) {
+                    log.warn("lighthouse", `[${this.name}] Lighthouse audit failed: ${lhError.message}`);
+                }
+            }
 
             log.debug("monitor", `[${this.name}] prometheus.update`);
             const data24h = uptimeCalculator.get24Hour();

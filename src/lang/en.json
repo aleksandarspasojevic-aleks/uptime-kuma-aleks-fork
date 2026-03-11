@@ -1506,5 +1506,18 @@
     "teltonikaModem": "Modem Id",
     "teltonikaModemHelptext": "The id of the SMS modem, must be in the format {0}. Refer to https://developers.teltonika-networks.com/reference/ for guidance.",
     "teltonikaPhoneNumber": "Phone number",
-    "teltonikaPhoneNumberHelptext": "The number must be in the international format {0}, {1}. Only one number is allowed."
+    "teltonikaPhoneNumberHelptext": "The number must be in the international format {0}, {1}. Only one number is allowed.",
+    "Lighthouse Audit": "Lighthouse Audit",
+    "Enable Lighthouse Audit": "Enable Lighthouse Audit",
+    "Lighthouse Audit Interval": "Lighthouse Audit Interval",
+    "lighthouseDescription": "Run Google Lighthouse audits to track Performance, Accessibility, Best Practices, and SEO scores over time.",
+    "lighthouseIntervalDescription": "How often to run the Lighthouse audit (minimum 300 seconds / 5 minutes). Lighthouse audits are resource-intensive, so a longer interval is recommended.",
+    "lighthouseAwaitingFirstRun": "Lighthouse audit has not run yet. Results will appear after the first audit completes.",
+    "Last Lighthouse Audit": "Last Lighthouse Audit",
+    "Performance": "Performance",
+    "Accessibility": "Accessibility",
+    "Best Practices": "Best Practices",
+    "SEO": "SEO",
+    "Score": "Score",
+    "secondsShort": "s"
 }

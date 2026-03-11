@@ -296,6 +296,29 @@
                 </div>
             </div>
 
+            <!-- Lighthouse Audit Scores -->
+            <div v-if="showLighthouseSection" class="shadow-box big-padding lighthouse-section">
+                <h2 class="mb-3">{{ $t("Lighthouse Audit") }}</h2>
+                <div v-if="latestLighthouse" class="lighthouse-gauges">
+                    <LighthouseScoreGauge :score="latestLighthouse.performance" :label="$t('Performance')" />
+                    <LighthouseScoreGauge :score="latestLighthouse.accessibility" :label="$t('Accessibility')" />
+                    <LighthouseScoreGauge
+                        :score="latestLighthouse.best_practices ?? latestLighthouse.bestPractices"
+                        :label="$t('Best Practices')"
+                    />
+                    <LighthouseScoreGauge :score="latestLighthouse.seo" :label="$t('SEO')" />
+                </div>
+                <div v-if="latestLighthouse" class="text-muted mt-2" style="font-size: 0.85em;">
+                    {{ $t("Last Lighthouse Audit") }}: <Datetime :value="latestLighthouse.time" />
+                </div>
+                <div v-else class="text-muted">
+                    {{ $t("lighthouseAwaitingFirstRun") }}
+                </div>
+                <div class="mt-4">
+                    <LighthouseChart :monitor-id="monitor.id" />
+                </div>
+            </div>
+
             <!-- Screenshot -->
             <div v-if="monitor.type === 'real-browser'" class="shadow-box">
                 <div class="row">
@@ -448,6 +471,8 @@ import "prismjs/components/prism-css";
 import { PrismEditor } from "vue-prism-editor";
 import "vue-prism-editor/dist/prismeditor.min.css";
 import ScreenshotDialog from "../components/ScreenshotDialog.vue";
+import LighthouseScoreGauge from "../components/LighthouseScoreGauge.vue";
+const LighthouseChart = defineAsyncComponent(() => import("../components/LighthouseChart.vue"));
 
 export default {
     components: {
@@ -463,6 +488,8 @@ export default {
         CertificateInfo,
         PrismEditor,
         ScreenshotDialog,
+        LighthouseScoreGauge,
+        LighthouseChart,
     },
     data() {
         return {
@@ -587,6 +614,20 @@ export default {
             } else {
                 return "";
             }
+        },
+
+        latestLighthouse() {
+            const list = this.$root.lighthouseData?.[this.monitor?.id];
+            if (!list || list.length === 0) {
+                return null;
+            }
+            return list.reduce((latest, row) => {
+                return new Date(row.time) > new Date(latest.time) ? row : latest;
+            }, list[0]);
+        },
+
+        showLighthouseSection() {
+            return this.monitor?.lighthouseEnabled;
         },
     },
 
@@ -857,6 +898,17 @@ export default {
 
 <style lang="scss" scoped>
 @import "../assets/vars.scss";
+
+.lighthouse-section {
+    text-align: center;
+}
+
+.lighthouse-gauges {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: wrap;
+}
 
 .form-check {
     margin-top: 16px;

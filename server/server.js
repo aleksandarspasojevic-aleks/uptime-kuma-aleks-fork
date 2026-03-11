@@ -764,6 +764,8 @@ let needSetup = false;
                 if (monitor.retryOnlyOnStatusCodeFailure !== undefined) {
                     bean.retry_only_on_status_code_failure = monitor.retryOnlyOnStatusCodeFailure;
                 }
+                bean.lighthouse_enabled = monitor.lighthouseEnabled;
+                bean.lighthouse_interval = monitor.lighthouseInterval;
                 bean.user_id = socket.userID;
 
                 bean.validate();
@@ -932,6 +934,10 @@ let needSetup = false;
                 bean.system_service_name = monitor.system_service_name;
                 bean.expected_tls_alert = monitor.expectedTlsAlert;
 
+                // lighthouse audit options
+                bean.lighthouse_enabled = monitor.lighthouseEnabled;
+                bean.lighthouse_interval = monitor.lighthouseInterval;
+
                 // ping advanced options
                 bean.ping_numeric = monitor.ping_numeric;
                 bean.ping_count = monitor.ping_count;
@@ -997,6 +1003,20 @@ let needSetup = false;
                     ok: true,
                     monitor: monitor.toJSON(preloadData),
                 });
+            } catch (e) {
+                callback({
+                    ok: false,
+                    msg: e.message,
+                });
+            }
+        });
+
+        socket.on("getLighthouseResults", async (monitorID, callback) => {
+            try {
+                checkLogin(socket);
+                const { sendLighthouseList } = require("./client");
+                await sendLighthouseList(socket, monitorID);
+                callback({ ok: true });
             } catch (e) {
                 callback({
                     ok: false,

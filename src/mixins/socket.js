@@ -53,6 +53,7 @@ export default {
             notificationList: [],
             dockerHostList: [],
             remoteBrowserList: [],
+            lighthouseData: {},
             statusPageListLoaded: false,
             statusPageList: [],
             proxyList: [],
@@ -239,6 +240,17 @@ export default {
                 } else {
                     this.heartbeatList[monitorID] = data.concat(this.heartbeatList[monitorID]);
                 }
+            });
+
+            socket.on("lighthouseResult", (data) => {
+                if (!(data.monitorID in this.lighthouseData)) {
+                    this.lighthouseData[data.monitorID] = [];
+                }
+                this.lighthouseData[data.monitorID].push(data);
+            });
+
+            socket.on("lighthouseList", (monitorID, data) => {
+                this.lighthouseData[monitorID] = data;
             });
 
             socket.on("avgPing", (monitorID, data) => {

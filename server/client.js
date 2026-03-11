@@ -235,6 +235,23 @@ async function sendMonitorTypeList(socket) {
     io.to(socket.userID).emit("monitorTypeList", Object.fromEntries(result));
 }
 
+/**
+ * Send Lighthouse audit history for a monitor
+ * @param {Socket} socket Socket.io socket instance
+ * @param {number} monitorID ID of the monitor
+ * @returns {Promise<void>}
+ */
+async function sendLighthouseList(socket, monitorID) {
+    let list = await R.getAll(`
+        SELECT * FROM lighthouse_result
+        WHERE monitor_id = ?
+        ORDER BY time DESC
+        LIMIT 500
+    `, [monitorID]);
+
+    io.to(socket.userID).emit("lighthouseList", monitorID, list);
+}
+
 module.exports = {
     sendNotificationList,
     sendImportantHeartbeatList,
@@ -245,4 +262,5 @@ module.exports = {
     sendDockerHostList,
     sendRemoteBrowserList,
     sendMonitorTypeList,
+    sendLighthouseList,
 };
