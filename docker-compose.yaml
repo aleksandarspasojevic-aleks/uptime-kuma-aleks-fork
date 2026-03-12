@@ -1,0 +1,41 @@
+services:
+  uptime-kuma:
+#    image: louislam/uptime-kuma:2
+    build:
+      dockerfile: dockerfile
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      - UPTIME_KUMA_DB_TYPE=mariadb
+      - UPTIME_KUMA_DB_HOSTNAME=mariadb
+      - UPTIME_KUMA_DB_PORT=3306
+      - UPTIME_KUMA_DB_NAME=uptime_kuma
+      - UPTIME_KUMA_DB_USERNAME=uptime_kuma
+      - UPTIME_KUMA_DB_PASSWORD=uptime_kuma_password
+    volumes:
+      - ./data:/app/data
+    ports:
+      # <Host Port>:<Container Port>
+      - "3001:3001"
+
+  mariadb:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=uptime_kuma
+      - MYSQL_USER=uptime_kuma
+      - MYSQL_PASSWORD=uptime_kuma_password
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mariadb_data:

@@ -33,12 +33,23 @@ async function runPlaywrightTests(monitorID, tests) {
 
     const fwdTestDir = monitorTestDir.replace(/\\/g, "/");
     const fwdReportDir = reportAbsDir.replace(/\\/g, "/");
+    const fwdOutputDir = path.resolve(Database.dataDir, "playwright-output", `monitor_${monitorID}`, `run_${runTimestamp}`).replace(/\\/g, "/");
+
+    if (!fs.existsSync(fwdOutputDir)) {
+        fs.mkdirSync(fwdOutputDir, { recursive: true });
+    }
+
+    const chromiumPath = process.env.PUPPETEER_EXECUTABLE_PATH || "";
+    const launchOptionsSnippet = chromiumPath
+        ? `\n        launchOptions: { executablePath: ${JSON.stringify(chromiumPath)}, args: ["--no-sandbox"] },`
+        : "";
 
     const configContent = `
 const { defineConfig } = require("@playwright/test");
 module.exports = defineConfig({
     testDir: ${JSON.stringify(fwdTestDir)},
     testMatch: ${JSON.stringify(tests.map(t => t.filename))},
+    outputDir: ${JSON.stringify(fwdOutputDir)},
     timeout: 60000,
     retries: 0,
     reporter: [
@@ -46,7 +57,7 @@ module.exports = defineConfig({
     ],
     use: {
         headless: true,
-        screenshot: "only-on-failure",
+        screenshot: "only-on-failure",${launchOptionsSnippet}
     },
 });
 `;
@@ -86,11 +97,12 @@ function shellQuote(s) {
 }
 
 /**
- * Execute npx playwright test via child_process.exec
+ * Execute playwright test via child_process.exec using the locally installed binary.
  */
 function runPlaywrightExec(configPath) {
     return new Promise((resolve, reject) => {
-        const cmd = `npx playwright test --config ${shellQuote(configPath)}`;
+        const playwrightBin = path.resolve(__dirname, "..", "node_modules", ".bin", "playwright");
+        const cmd = `${shellQuote(playwrightBin)} test --config ${shellQuote(configPath)}`;
 
         log.debug("playwright", `Executing: ${cmd}`);
 
